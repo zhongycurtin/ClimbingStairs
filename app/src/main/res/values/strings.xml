@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">步步登峰</string>
+    <string name="app_subtitle">阶梯减脂·轻量自律</string>
+    <string name="nav_home">今日打卡</string>
+    <string name="nav_stats">趋势成就</string>
+    <string name="start_climb">开始爬楼</string>
+    <string name="finish_climb">完成这一趟 (+1)</string>
+    <string name="quick_add">快速+1趟</string>
+    <string name="backfill">漏记补录</string>
+    <string name="floors_per_lap">单趟楼层</string>
+    <string name="current_weight">当前体重</string>
+    <string name="total_duration">总耗时</string>
+    <string name="avg_duration">平均每趟</string>
+    <string name="export_data">导出数据 (CSV)</string>
+</resources>
