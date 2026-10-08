@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,14 +36,16 @@ jobs:
           set -o pipefail
           gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build_output.log
 
-      - name: Report Build Error on Failure
+      - name: Post Failure Log as Commit Comment
         if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "### ❌ Gradle Build Error Details" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          tail -n 60 build_output.log >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -n 40 build_output.log
+          echo "### ❌ Build Error Log" > comment_body.md
+          echo '```text' >> comment_body.md
+          tail -n 45 build_output.log >> comment_body.md
+          echo '```' >> comment_body.md
+          gh api -X POST "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" --input comment_body.md || true
 
       - name: Upload Artifact
         if: always()
