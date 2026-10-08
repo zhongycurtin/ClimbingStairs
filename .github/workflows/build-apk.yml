@@ -37,6 +37,7 @@ jobs:
         run: |
           set -o pipefail
           gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build_output.log
+          cp app/build/outputs/apk/debug/app-debug.apk StairStep-v1.0.0.apk
 
       - name: Push Build Log on Failure
         if: failure()
@@ -55,5 +56,24 @@ jobs:
         with:
           name: StairStep-Build-Outputs
           path: |
+            StairStep-v1.0.0.apk
             app/build/outputs/apk/debug/app-debug.apk
             build_output.log
+
+      - name: Create or Update GitHub Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: "StairStep 步步登峰 v1.0.0"
+          body: |
+            ## 🏃 步步登峰 (StairStep) Android APK 安装包
+            
+            ### ✨ 功能特性
+            - **极简设计**：墨绿/薄荷绿清爽配色，大尺寸触觉反馈爬楼计数按钮
+            - **灵活分段**：支持白天“摸鱼爬”与晚上“燃脂爬”，自动记录每趟用时与平均配速
+            - **消耗估算与数据统计**：基于体重与垂直爬升精确计算 MET 消耗，双曲线呈现运动与体重走势
+            - **补录与导出**：遗漏日期支持补录，支持一键导出 CSV 备份
+          files: StairStep-v1.0.0.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
