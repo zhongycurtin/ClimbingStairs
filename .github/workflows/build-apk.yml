@@ -33,11 +33,15 @@ jobs:
           set -o pipefail
           gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build_output.log
 
-      - name: Print Error Summary on Failure
+      - name: Report Build Error on Failure
         if: failure()
         run: |
-          echo "=== GRADLE FAILURE SUMMARY ==="
-          grep -E "e: |error:|FAILED|FAILURE" build_output.log -A 8 -B 2 | head -n 80 || tail -n 80 build_output.log
+          echo "### ❌ Gradle Build Error Details" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          grep -E "e: |error:|FAILED|FAILURE|Exception" build_output.log -A 10 -B 2 | head -n 120 >> $GITHUB_STEP_SUMMARY || tail -n 100 build_output.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ERR_MSG=$(grep -m 1 -E "e: |error:|FAILED" build_output.log || echo "Gradle build failed")
+          echo "::error title=Gradle Build Error::$ERR_MSG"
 
       - name: Upload Artifact
         if: always()
