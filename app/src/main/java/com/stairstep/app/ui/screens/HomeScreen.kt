@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.FitnessCenter
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Height
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.MonitorWeight
@@ -45,12 +46,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stairstep.app.ui.components.BackfillDialog
 import com.stairstep.app.ui.components.BigClimbButton
 import com.stairstep.app.ui.components.FloorSettingDialog
+import com.stairstep.app.ui.components.SessionSummaryDialog
 import com.stairstep.app.ui.components.StatCard
 import com.stairstep.app.ui.components.TripTimelineItem
 import com.stairstep.app.ui.components.WeightInputDialog
@@ -70,8 +73,11 @@ fun HomeScreen(
     val floorsPerLap by viewModel.floorsPerLap.collectAsState()
     val defaultWeight by viewModel.defaultWeight.collectAsState()
     val latestWeightRecord by viewModel.latestWeightRecord.collectAsState()
-    val isTiming by viewModel.isTiming.collectAsState()
-    val elapsedSeconds by viewModel.elapsedSeconds.collectAsState()
+    val isSessionActive by viewModel.isSessionActive.collectAsState()
+    val sessionLapCount by viewModel.sessionLapCount.collectAsState()
+    val currentLapSeconds by viewModel.currentLapSeconds.collectAsState()
+    val sessionTotalSeconds by viewModel.sessionTotalSeconds.collectAsState()
+    val sessionSummary by viewModel.sessionSummary.collectAsState()
 
     var showFloorDialog by remember { mutableStateOf(false) }
     var showWeightDialog by remember { mutableStateOf(false) }
@@ -259,23 +265,24 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(28.dp))
         }
 
-        // 核心交互大圆钮区域 (开始计时 / 完成+1)
+        // 核心交互大圆钮区域 (开始运动 / 连爬多趟打卡)
         item {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 BigClimbButton(
-                    isTiming = isTiming,
-                    elapsedSeconds = elapsedSeconds,
-                    onStartClick = { viewModel.startClimbSession() },
-                    onFinishClick = { viewModel.finishClimbSession() }
+                    isSessionActive = isSessionActive,
+                    sessionLapCount = sessionLapCount,
+                    currentLapSeconds = currentLapSeconds,
+                    onStartClick = { viewModel.startWorkoutSession() },
+                    onLapFinishClick = { viewModel.recordLapAndContinue() }
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 快捷摸鱼操作按钮
-                if (!isTiming) {
+                if (!isSessionActive) {
+                    // 快捷摸鱼操作按钮
                     OutlinedButton(
                         onClick = { viewModel.quickAddTrip("摸鱼爬") },
                         shape = RoundedCornerShape(20.dp),
@@ -294,16 +301,57 @@ fun HomeScreen(
                         )
                     }
                 } else {
-                    OutlinedButton(
-                        onClick = { viewModel.cancelClimbSession() },
-                        shape = RoundedCornerShape(20.dp),
-                        modifier = Modifier.height(36.dp)
+                    // 会话进行中状态与操作按钮
+                    val totalM = sessionTotalSeconds / 60
+                    val totalS = sessionTotalSeconds % 60
+                    val totalTimeFormatted = if (totalM > 0) "${totalM}分${totalS}秒" else "${totalS}秒"
+
+                    Text(
+                        text = "本次已爬 $sessionLapCount 趟 · 累计用时 $totalTimeFormatted",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "放弃本次计时",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
+                        Button(
+                            onClick = { viewModel.finishWorkoutSession() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (sessionLapCount > 0) MintEmerald else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (sessionLapCount > 0) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.height(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Flag,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (sessionLapCount > 0) "结束运动并打卡 ($sessionLapCount 趟)" else "结束运动",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.cancelWorkoutSession() },
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.height(40.dp)
+                        ) {
+                            Text(
+                                text = "放弃",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
                     }
                 }
             }
@@ -390,6 +438,13 @@ fun HomeScreen(
                 viewModel.backfillRecord(date, floors, weight)
                 showBackfillDialog = false
             }
+        )
+    }
+
+    sessionSummary?.let { summary ->
+        SessionSummaryDialog(
+            summary = summary,
+            onDismiss = { viewModel.dismissSessionSummary() }
         )
     }
 }

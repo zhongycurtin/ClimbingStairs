@@ -138,33 +138,49 @@ function determineAutoTag() {
   return "深夜攀爬";
 }
 
-// 核心打卡操作
-function startTimer() {
-  isTiming = true;
-  timerStartMillis = Date.now();
+// 核心打卡与运动会话操作 (支持一次运动连续爬多趟)
+let isSessionActive = false;
+let sessionStartMillis = 0;
+let currentLapStartMillis = 0;
+let sessionLaps = 0;
+let sessionCalories = 0;
+let sessionTimerInterval = null;
+
+function startWorkoutSession() {
+  isSessionActive = true;
+  sessionStartMillis = Date.now();
+  currentLapStartMillis = sessionStartMillis;
+  sessionLaps = 0;
+  sessionCalories = 0;
+
   document.getElementById("heroButton").classList.add("timing");
   document.getElementById("heroBtnInner").classList.add("timing");
   document.getElementById("idleBtnContent").style.display = "none";
   document.getElementById("timingBtnContent").style.display = "block";
   document.getElementById("quickAddBtn").style.display = "none";
-  document.getElementById("cancelTimerBtn").style.display = "block";
+  document.getElementById("activeSessionBar").style.display = "flex";
 
-  updateLiveTimer();
-  timerInterval = setInterval(updateLiveTimer, 500);
+  updateSessionUI();
+  sessionTimerInterval = setInterval(updateSessionUI, 500);
 }
 
-function updateLiveTimer() {
-  const elapsed = Math.floor((Date.now() - timerStartMillis) / 1000);
-  const m = Math.floor(elapsed / 60).toString().padStart(2, "0");
-  const s = (elapsed % 60).toString().padStart(2, "0");
-  document.getElementById("liveTimerText").innerText = `${m}:${s}`;
+function updateSessionUI() {
+  const lapElapsed = Math.floor((Date.now() - currentLapStartMillis) / 1000);
+  const totalElapsed = Math.floor((Date.now() - sessionStartMillis) / 1000);
+
+  const lm = Math.floor(lapElapsed / 60).toString().padStart(2, "0");
+  const ls = (lapElapsed % 60).toString().padStart(2, "0");
+  document.getElementById("liveTimerText").innerText = `${lm}:${ls}`;
+
+  document.getElementById("sessionLapBadge").innerText = `第 ${sessionLaps + 1} 趟进行中`;
+  document.getElementById("sessionStatusSub").innerText = `本次已爬 ${sessionLaps} 趟 · 累计用时 ${formatDuration(totalElapsed)}`;
 }
 
-function finishTimer() {
-  if (!isTiming) return;
-  const duration = Math.max(1, Math.floor((Date.now() - timerStartMillis) / 1000));
-  const startTime = timerStartMillis;
-  const endTime = Date.now();
+function recordLapAndContinue() {
+  if (!isSessionActive) return;
+  const now = Date.now();
+  const duration = Math.max(1, Math.floor((now - currentLapStartMillis) / 1000));
+  const startTime = currentLapStartMillis;
   const floors = settings.floorsPerLap;
   const cal = calculateCalories(duration, floors, settings.currentWeight);
   const tag = determineAutoTag();
@@ -173,7 +189,7 @@ function finishTimer() {
     id: Date.now(),
     date: getTodayDateStr(),
     startTime,
-    endTime,
+    endTime: now,
     durationSeconds: duration,
     floors,
     calories: cal,
@@ -181,25 +197,50 @@ function finishTimer() {
     isBackfill: false
   });
 
-  resetTimer();
+  sessionLaps++;
+  sessionCalories += cal;
+  currentLapStartMillis = now;
+
   saveData();
   renderAll();
+  updateSessionUI();
 }
 
-function cancelTimer() {
-  resetTimer();
+function finishWorkoutSession() {
+  if (!isSessionActive) return;
+  const totalSeconds = Math.max(1, Math.floor((Date.now() - sessionStartMillis) / 1000));
+  const laps = sessionLaps;
+  const floors = laps * settings.floorsPerLap;
+  const cal = sessionCalories;
+  const avg = laps > 0 ? Math.round(totalSeconds / laps) : 0;
+
+  resetWorkoutSession();
+
+  if (laps > 0) {
+    document.getElementById("summaryLaps").innerText = `${laps} 趟`;
+    document.getElementById("summaryFloors").innerText = `${floors} 层 (${floors * 3} 米)`;
+    document.getElementById("summaryCalories").innerText = `${Math.round(cal)} kcal`;
+    document.getElementById("summaryTotalTime").innerText = formatDuration(totalSeconds);
+    document.getElementById("summaryAvgTime").innerText = formatDuration(avg);
+    document.getElementById("sessionSummaryModal").classList.add("open");
+  }
 }
 
-function resetTimer() {
-  isTiming = false;
-  clearInterval(timerInterval);
-  timerInterval = null;
+function cancelWorkoutSession() {
+  resetWorkoutSession();
+}
+
+function resetWorkoutSession() {
+  isSessionActive = false;
+  clearInterval(sessionTimerInterval);
+  sessionTimerInterval = null;
+
   document.getElementById("heroButton").classList.remove("timing");
   document.getElementById("heroBtnInner").classList.remove("timing");
   document.getElementById("idleBtnContent").style.display = "block";
   document.getElementById("timingBtnContent").style.display = "none";
   document.getElementById("quickAddBtn").style.display = "flex";
-  document.getElementById("cancelTimerBtn").style.display = "none";
+  document.getElementById("activeSessionBar").style.display = "none";
 }
 
 function quickAddTrip() {
@@ -542,6 +583,106 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
+// 恢复导入 CSV
+function handleCsvImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const text = evt.target.result;
+      const lines = text.split(/\r?\n/);
+      let section = 0;
+      let importedTrips = 0;
+      let importedWeights = 0;
+
+      const existingTripTimes = new Set(trips.map(t => t.startTime));
+      const existingWeightDates = new Set(weights.map(w => w.date));
+
+      lines.forEach(rawLine => {
+        const line = rawLine.trim();
+        if (!line) return;
+        if (line.includes("爬楼运动记录")) { section = 1; return; }
+        if (line.includes("体重追踪")) { section = 2; return; }
+        if (line.startsWith("ID,") || line.startsWith("ID，")) return;
+
+        const tokens = parseCsvLine(line);
+        if (section === 1 && tokens.length >= 8) {
+          const date = tokens[1];
+          const startTime = new Date(tokens[2]).getTime() || Date.now();
+          const endTime = new Date(tokens[3]).getTime() || (startTime + 120000);
+          const duration = parseInt(tokens[4]) || 120;
+          const floors = parseInt(tokens[5]) || 18;
+          const calories = parseFloat(tokens[6]) || 25;
+          const tag = tokens[7] || "摸鱼爬";
+          const isBackfill = (tokens[8] || "").includes("是");
+
+          if (!existingTripTimes.has(startTime)) {
+            trips.push({
+              id: startTime,
+              date,
+              startTime,
+              endTime,
+              durationSeconds: duration,
+              floors,
+              calories,
+              tag,
+              isBackfill
+            });
+            existingTripTimes.add(startTime);
+            importedTrips++;
+          }
+        } else if (section === 2 && tokens.length >= 4) {
+          const date = tokens[1];
+          const timestamp = new Date(tokens[2]).getTime() || Date.now();
+          const weight = parseFloat(tokens[3]) || 65.0;
+
+          if (!existingWeightDates.has(date)) {
+            weights.push({
+              id: timestamp,
+              date,
+              weight,
+              timestamp
+            });
+            existingWeightDates.add(date);
+            importedWeights++;
+          }
+        }
+      });
+
+      trips.sort((a, b) => b.startTime - a.startTime);
+      weights.sort((a, b) => a.date.localeCompare(b.date));
+      if (weights.length > 0) {
+        settings.currentWeight = weights[weights.length - 1].weight;
+      }
+
+      saveData();
+      renderAll();
+      alert(`🎉 成功恢复数据！\n导入 ${importedTrips} 条爬楼记录，${importedWeights} 条体重记录。`);
+    } catch (err) {
+      alert("导入失败: " + err.message);
+    }
+  };
+  reader.readAsText(file, "UTF-8");
+}
+
+function parseCsvLine(line) {
+  const result = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') inQuotes = !inQuotes;
+    else if (ch === ',' && !inQuotes) {
+      result.push(cur.trim());
+      cur = "";
+    } else cur += ch;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
 function updateClock() {
   const d = new Date();
   const h = d.getHours().toString().padStart(2, "0");
@@ -555,18 +696,39 @@ function setupEventListeners() {
   document.getElementById("tabHome").onclick = () => switchTab("home");
   document.getElementById("tabStats").onclick = () => switchTab("stats");
 
-  // 核心大圆钮 (开始 / 完成)
+  // 核心大圆钮 (开启运动会话 / 拍击完成当前趟)
   document.getElementById("heroButton").onclick = () => {
-    if (!isTiming) {
-      startTimer();
+    if (!isSessionActive) {
+      startWorkoutSession();
     } else {
-      finishTimer();
+      recordLapAndContinue();
     }
+  };
+
+  // 结束运动并打卡
+  const finishBtn = document.getElementById("finishSessionBtn");
+  if (finishBtn) finishBtn.onclick = () => finishWorkoutSession();
+
+  // 放弃本次运动会话
+  document.getElementById("cancelTimerBtn").onclick = () => cancelWorkoutSession();
+
+  // 结算弹窗关闭
+  const closeSummary = document.getElementById("closeSummaryModal");
+  if (closeSummary) closeSummary.onclick = () => {
+    document.getElementById("sessionSummaryModal").classList.remove("open");
   };
 
   // 摸鱼快捷 +1
   document.getElementById("quickAddBtn").onclick = () => quickAddTrip();
-  document.getElementById("cancelTimerBtn").onclick = () => cancelTimer();
+
+  // 导入/导出 CSV
+  document.getElementById("exportCsvBtn").onclick = () => exportCsv();
+  const importBtn = document.getElementById("importCsvBtn");
+  const fileInput = document.getElementById("csvFileInput");
+  if (importBtn && fileInput) {
+    importBtn.onclick = () => fileInput.click();
+    fileInput.onchange = handleCsvImport;
+  }
 
   // 周期切换
   document.getElementById("range7Btn").onclick = () => {

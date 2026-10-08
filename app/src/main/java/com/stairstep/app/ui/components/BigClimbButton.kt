@@ -16,8 +16,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DirectionsRun
 import androidx.compose.material.icons.rounded.Done
@@ -41,18 +44,19 @@ import com.stairstep.app.ui.theme.MintEmerald
 
 @Composable
 fun BigClimbButton(
-    isTiming: Boolean,
-    elapsedSeconds: Long,
+    isSessionActive: Boolean,
+    sessionLapCount: Int,
+    currentLapSeconds: Long,
     onStartClick: () -> Unit,
-    onFinishClick: () -> Unit,
+    onLapFinishClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = if (isTiming) 1.06f else 1.02f,
+        targetValue = if (isSessionActive) 1.06f else 1.02f,
         animationSpec = infiniteRepeatable(
-            animation = tween(if (isTiming) 800 else 2000, easing = FastOutSlowInEasing),
+            animation = tween(if (isSessionActive) 800 else 2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulseScale"
@@ -62,17 +66,17 @@ fun BigClimbButton(
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.size(220.dp)
+        modifier = modifier.size(230.dp)
     ) {
         // 呼吸背景外光晕
         Box(
             modifier = Modifier
-                .size(200.dp)
+                .size(210.dp)
                 .scale(pulseScale)
                 .clip(CircleShape)
                 .background(
-                    if (isTiming) {
-                        MintEmerald.copy(alpha = 0.15f)
+                    if (isSessionActive) {
+                        MintEmerald.copy(alpha = 0.16f)
                     } else {
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
                     }
@@ -83,19 +87,19 @@ fun BigClimbButton(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(175.dp)
+                .size(185.dp)
                 .shadow(
-                    elevation = if (isTiming) 12.dp else 6.dp,
+                    elevation = if (isSessionActive) 14.dp else 6.dp,
                     shape = CircleShape,
-                    spotColor = MintEmerald.copy(alpha = 0.4f)
+                    spotColor = MintEmerald.copy(alpha = 0.45f)
                 )
                 .clip(CircleShape)
                 .background(
-                    if (isTiming) {
+                    if (isSessionActive) {
                         Brush.linearGradient(
                             listOf(
                                 Color(0xFF10B981),
-                                Color(0xFF059669)
+                                Color(0xFF047857)
                             )
                         )
                     } else {
@@ -108,16 +112,16 @@ fun BigClimbButton(
                     }
                 )
                 .border(
-                    width = if (isTiming) 2.dp else 1.5.dp,
-                    color = if (isTiming) Color.White.copy(alpha = 0.6f) else MintEmerald.copy(alpha = 0.35f),
+                    width = if (isSessionActive) 2.5.dp else 1.5.dp,
+                    color = if (isSessionActive) Color.White.copy(alpha = 0.65f) else MintEmerald.copy(alpha = 0.35f),
                     shape = CircleShape
                 )
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null
                 ) {
-                    if (isTiming) {
-                        onFinishClick()
+                    if (isSessionActive) {
+                        onLapFinishClick()
                     } else {
                         onStartClick()
                     }
@@ -127,31 +131,55 @@ fun BigClimbButton(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                if (isTiming) {
-                    val minutes = elapsedSeconds / 60
-                    val seconds = elapsedSeconds % 60
+                if (isSessionActive) {
+                    // 正在进行第 N 趟
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.White.copy(alpha = 0.22f))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "第 ${sessionLapCount + 1} 趟进行中",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    val minutes = currentLapSeconds / 60
+                    val seconds = currentLapSeconds % 60
                     val timeString = String.format("%02d:%02d", minutes, seconds)
 
                     Text(
                         text = timeString,
                         fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         color = Color.White
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     Row(
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.18f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Done,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = " 完成并+1趟",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            text = "拍击完成 (+1)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                     }
@@ -160,7 +188,7 @@ fun BigClimbButton(
                         imageVector = Icons.Rounded.DirectionsRun,
                         contentDescription = null,
                         tint = MintEmerald,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(38.dp)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
@@ -171,10 +199,10 @@ fun BigClimbButton(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "点击启动计时",
+                        text = "开启连续多趟记录",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
                 }
             }

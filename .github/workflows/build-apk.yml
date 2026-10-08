@@ -37,7 +37,7 @@ jobs:
         run: |
           set -o pipefail
           gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build_output.log
-          cp app/build/outputs/apk/debug/app-debug.apk StairStep-v1.0.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk StairStep-v1.1.0.apk
 
       - name: Push Build Log on Failure
         if: failure()
@@ -56,7 +56,7 @@ jobs:
         with:
           name: StairStep-Build-Outputs
           path: |
-            StairStep-v1.0.0.apk
+            StairStep-v1.1.0.apk
             app/build/outputs/apk/debug/app-debug.apk
             build_output.log
 
@@ -64,16 +64,21 @@ jobs:
         if: success()
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: "StairStep 步步登峰 v1.0.0"
+          tag_name: v1.1.0
+          name: "StairStep 步步登峰 v1.1.0"
           body: |
-            ## 🏃 步步登峰 (StairStep) Android APK 安装包
+            ## 🏃 步步登峰 (StairStep) v1.1.0 APK 安装包
             
-            ### ✨ 功能特性
-            - **极简设计**：墨绿/薄荷绿清爽配色，大尺寸触觉反馈爬楼计数按钮
-            - **灵活分段**：支持白天“摸鱼爬”与晚上“燃脂爬”，自动记录每趟用时与平均配速
-            - **消耗估算与数据统计**：基于体重与垂直爬升精确计算 MET 消耗，双曲线呈现运动与体重走势
-            - **补录与导出**：遗漏日期支持补录，支持一键导出 CSV 备份
-          files: StairStep-v1.0.0.apk
+            ### ✨ 本次更新
+            1. **运动交互全新升级（支持连续连爬多趟）**：
+               - 点击“开始爬楼”启动运动后，每爬完一趟只需拍击大圆钮即可完成本趟打卡 (+1)！
+               - 计时器不中断，继续为下一趟计时，完美契合晚上连续爬楼的多趟训练场景。
+               - 全部爬完后点击“🏁 结束运动并打卡”，自动弹出成就总结。
+            2. **数据备份与一键恢复**：
+               - 新增 CSV 数据一键恢复功能，换机或重装无缝还原所有爬楼明细与体重记录。
+            3. **固化永久签名证书**：
+               - 正式配置专属项目签名 Keystore，保障后续各版本覆盖安装升级数据不丢失。
+          files: StairStep-v1.1.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

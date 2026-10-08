@@ -47,62 +47,94 @@ class ClimbViewModel(application: Application) : AndroidViewModel(application) {
     val latestWeightRecord: StateFlow<WeightRecord?> = weightDao.getLatestWeightFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    // 实时计时器状态
-    private val _isTiming = MutableStateFlow(false)
-    val isTiming: StateFlow<Boolean> = _isTiming.asStateFlow()
+data class SessionSummary(
+    val laps: Int,
+    val totalFloors: Int,
+    val totalSeconds: Long,
+    val totalCalories: Double
+)
+
+    // 运动会话状态
+    private val _isSessionActive = MutableStateFlow(false)
+    val isSessionActive: StateFlow<Boolean> = _isSessionActive.asStateFlow()
+    val isTiming: StateFlow<Boolean> = _isSessionActive.asStateFlow()
+
+    private val _sessionLapCount = MutableStateFlow(0)
+    val sessionLapCount: StateFlow<Int> = _sessionLapCount.asStateFlow()
 
     private val _sessionStartTime = MutableStateFlow(0L)
     val sessionStartTime: StateFlow<Long> = _sessionStartTime.asStateFlow()
 
-    private val _elapsedSeconds = MutableStateFlow(0L)
-    val elapsedSeconds: StateFlow<Long> = _elapsedSeconds.asStateFlow()
+    private val _currentLapStartTime = MutableStateFlow(0L)
+    val currentLapStartTime: StateFlow<Long> = _currentLapStartTime.asStateFlow()
+
+    private val _sessionTotalSeconds = MutableStateFlow(0L)
+    val sessionTotalSeconds: StateFlow<Long> = _sessionTotalSeconds.asStateFlow()
+
+    private val _currentLapSeconds = MutableStateFlow(0L)
+    val currentLapSeconds: StateFlow<Long> = _currentLapSeconds.asStateFlow()
+    val elapsedSeconds: StateFlow<Long> = _currentLapSeconds.asStateFlow()
+
+    private val _lastCompletedLapDuration = MutableStateFlow<Long?>(null)
+    val lastCompletedLapDuration: StateFlow<Long?> = _lastCompletedLapDuration.asStateFlow()
+
+    private val _sessionCalories = MutableStateFlow(0.0)
+
+    private val _sessionSummary = MutableStateFlow<SessionSummary?>(null)
+    val sessionSummary: StateFlow<SessionSummary?> = _sessionSummary.asStateFlow()
 
     private var timerJob: Job? = null
 
     /**
-     * 开启爬楼计时
+     * 开启爬楼运动会话 (支持一次运动连续爬多趟)
      */
-    fun startClimbSession() {
-        if (_isTiming.value) return
+    fun startWorkoutSession() {
+        if (_isSessionActive.value) return
         val now = System.currentTimeMillis()
         _sessionStartTime.value = now
-        _elapsedSeconds.value = 0L
-        _isTiming.value = true
+        _currentLapStartTime.value = now
+        _sessionTotalSeconds.value = 0L
+        _currentLapSeconds.value = 0L
+        _sessionLapCount.value = 0
+        _sessionCalories.value = 0.0
+        _lastCompletedLapDuration.value = null
+        _isSessionActive.value = true
 
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
-            while (_isTiming.value) {
+            while (_isSessionActive.value) {
                 delay(1000L)
-                _elapsedSeconds.value = (System.currentTimeMillis() - _sessionStartTime.value) / 1000
+                val curTime = System.currentTimeMillis()
+                _sessionTotalSeconds.value = (curTime - _sessionStartTime.value) / 1000
+                _currentLapSeconds.value = (curTime - _currentLapStartTime.value) / 1000
             }
         }
     }
 
     /**
-     * 完成当前趟并记录 (+1)
+     * 会话内完成一趟并记录 (+1)，计时器不退出，继续为下一趟计时
      */
-    fun finishClimbSession(tag: String? = null) {
-        if (!_isTiming.value) return
-        val endTime = System.currentTimeMillis()
-        val startTime = _sessionStartTime.value
-        val duration = maxOf(1L, (endTime - startTime) / 1000)
+    fun recordLapAndContinue(tag: String? = null) {
+        if (!_isSessionActive.value) return
+        val now = System.currentTimeMillis()
+        val lapStart = _currentLapStartTime.value
+        val duration = maxOf(1L, (now - lapStart) / 1000)
         val floors = floorsPerLap.value
         val weight = latestWeightRecord.value?.weightKg ?: defaultWeight.value
 
-        // 计算卡路里：以爬楼 MET=8.8 计算，每小时耗能 = 8.8 * weight * (duration/3600)
-        // 阶梯做功最低保底每层约 0.15 * weight / 10
+        // 计算卡路里：以爬楼 MET=8.8 计算
         val calByTime = (8.8 * weight * (duration / 3600.0))
         val calByFloors = (floors * 0.14 * (weight / 60.0))
         val calories = maxOf(calByTime, calByFloors)
 
-        val autoTag = tag ?: determineAutoTag(startTime)
+        val autoTag = tag ?: determineAutoTag(lapStart)
 
         viewModelScope.launch {
             climbDao.insertTrip(
                 ClimbTrip(
                     date = todayDate,
-                    startTimeMillis = startTime,
-                    endTimeMillis = endTime,
+                    startTimeMillis = lapStart,
+                    endTimeMillis = now,
                     durationSeconds = duration,
                     floors = floors,
                     estimatedCalories = calories,
@@ -110,21 +142,58 @@ class ClimbViewModel(application: Application) : AndroidViewModel(application) {
                     isBackfill = false
                 )
             )
-            resetTimer()
         }
+
+        _sessionLapCount.value += 1
+        _lastCompletedLapDuration.value = duration
+        _sessionCalories.value += calories
+
+        // 为下一趟重新计时
+        _currentLapStartTime.value = now
+        _currentLapSeconds.value = 0L
     }
 
     /**
-     * 取消当前计时
+     * 结束本次运动会话并生成结算报告
      */
-    fun cancelClimbSession() {
-        resetTimer()
+    fun finishWorkoutSession() {
+        if (!_isSessionActive.value) return
+        val laps = _sessionLapCount.value
+        val totalSecs = _sessionTotalSeconds.value
+        val floors = laps * floorsPerLap.value
+        val cals = _sessionCalories.value
+
+        if (laps > 0) {
+            _sessionSummary.value = SessionSummary(
+                laps = laps,
+                totalFloors = floors,
+                totalSeconds = totalSecs,
+                totalCalories = cals
+            )
+        }
+
+        resetWorkoutSession()
     }
 
-    private fun resetTimer() {
-        _isTiming.value = false
+    fun dismissSessionSummary() {
+        _sessionSummary.value = null
+    }
+
+    /**
+     * 取消/放弃本次运动会话
+     */
+    fun cancelWorkoutSession() {
+        resetWorkoutSession()
+    }
+
+    private fun resetWorkoutSession() {
+        _isSessionActive.value = false
         _sessionStartTime.value = 0L
-        _elapsedSeconds.value = 0L
+        _currentLapStartTime.value = 0L
+        _sessionTotalSeconds.value = 0L
+        _currentLapSeconds.value = 0L
+        _sessionLapCount.value = 0
+        _sessionCalories.value = 0.0
         timerJob?.cancel()
         timerJob = null
     }

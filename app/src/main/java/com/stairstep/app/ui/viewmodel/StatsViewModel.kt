@@ -128,4 +128,23 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
             weights = allWeights.value
         )
     }
+
+    /**
+     * 导入恢复 CSV 备份文件
+     */
+    fun importCsv(
+        context: Context,
+        uri: android.net.Uri,
+        onResult: (com.stairstep.app.data.export.ImportResult) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = com.stairstep.app.data.export.DataImporter.importFromCsv(
+                context = context,
+                uri = uri,
+                climbDao = climbDao,
+                weightDao = weightDao
+            )
+            onResult(result)
+        }
+    }
 }

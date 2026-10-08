@@ -127,12 +127,13 @@
                 <path d="M13 4v16M7 14l6-6 6 6"/>
               </svg>
               <div class="big-btn-title">开始爬楼</div>
-              <div class="big-btn-sub">启动实时计时</div>
+              <div class="big-btn-sub">开启连续多趟记录</div>
             </div>
             <div id="timingBtnContent" style="display:none; text-align:center;">
+              <div id="sessionLapBadge" style="font-size:11px; font-weight:700; background:rgba(255,255,255,0.25); border-radius:10px; padding:2px 8px; display:inline-block; margin-bottom:4px;">第 1 趟进行中</div>
               <div class="timer-digits" id="liveTimerText">00:00</div>
               <div class="timer-finish-label">
-                <span>✓</span> 点击完成并+1趟
+                <span>✓</span> 拍击完成此趟 (+1)
               </div>
             </div>
           </div>
@@ -143,9 +144,20 @@
           <span>+</span> 摸鱼爬快捷+1趟 (无需计时)
         </button>
 
-        <button class="cancel-timing-btn" id="cancelTimerBtn" style="display:none;">
-          放弃本次计时
-        </button>
+        <!-- 会话进行中操作栏 -->
+        <div id="activeSessionBar" style="display:none; flex-direction:column; align-items:center; width:100%; gap:8px;">
+          <div id="sessionStatusSub" style="font-size:12px; color:var(--text-secondary); font-weight:500;">
+            本次已爬 0 趟 · 累计用时 0秒
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button id="finishSessionBtn" style="padding:8px 18px; border-radius:20px; font-size:13px; font-weight:700; background:var(--primary); color:#fff; border:none; cursor:pointer;">
+              🏁 结束运动并打卡
+            </button>
+            <button id="cancelTimerBtn" style="padding:8px 14px; border-radius:20px; font-size:12px; background:transparent; border:1px solid var(--border-color); color:var(--text-secondary); cursor:pointer;">
+              放弃
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- 今日流水明细 -->
@@ -166,14 +178,20 @@
           <div class="date-sub">数据沉淀与进阶</div>
           <div class="app-title">趋势与成就</div>
         </div>
-        <button class="icon-btn" id="exportCsvBtn" title="导出数据 (CSV)" style="width:auto; padding:0 12px; border-radius:18px; font-size:12px; font-weight:700;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-right:4px;">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          导出CSV
-        </button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none;">
+          <button class="icon-btn" id="importCsvBtn" title="恢复数据 (CSV)" style="width:auto; padding:0 12px; border-radius:18px; font-size:11px; font-weight:600;">
+            恢复
+          </button>
+          <button class="icon-btn" id="exportCsvBtn" title="导出数据 (CSV)" style="width:auto; padding:0 12px; border-radius:18px; font-size:11px; font-weight:700;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-right:3px;">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            备份
+          </button>
+        </div>
       </div>
 
       <!-- 累计成就指标 -->
@@ -307,6 +325,36 @@
         <button class="btn-secondary" id="closeBackfillModal">取消</button>
         <button class="btn-primary" id="saveBackfillModal">确认补录</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 弹窗 4: 运动完成结算弹窗 -->
+  <div class="modal-overlay" id="sessionSummaryModal">
+    <div class="modal-content" style="text-align:center;">
+      <div style="width:52px; height:52px; border-radius:50%; background:rgba(16,185,129,0.15); color:#10b981; font-size:26px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:12px;">✓</div>
+      <div class="modal-title" style="margin-bottom:4px;">本次运动完成！</div>
+      <div class="modal-desc" style="margin-bottom:18px;">每一步都在超越昨天的自己</div>
+
+      <div class="bento-grid" style="margin-bottom:20px;">
+        <div class="stat-card" style="padding:10px;">
+          <div style="font-size:11px; color:var(--text-secondary);">连续爬升</div>
+          <div style="font-size:18px; font-weight:800; color:var(--text-primary); margin-top:4px;" id="summaryLaps">0 趟</div>
+          <div style="font-size:10px; color:var(--text-secondary);" id="summaryFloors">0 层 (0 米)</div>
+        </div>
+        <div class="stat-card" style="padding:10px;">
+          <div style="font-size:11px; color:var(--text-secondary);">预估消耗</div>
+          <div style="font-size:18px; font-weight:800; color:#f59e0b; margin-top:4px;" id="summaryCalories">0 kcal</div>
+        </div>
+        <div class="stat-card" style="padding:10px;">
+          <div style="font-size:11px; color:var(--text-secondary);">总用时</div>
+          <div style="font-size:16px; font-weight:800; color:var(--text-primary); margin-top:4px;" id="summaryTotalTime">0秒</div>
+        </div>
+        <div class="stat-card" style="padding:10px;">
+          <div style="font-size:11px; color:var(--text-secondary);">平均单趟</div>
+          <div style="font-size:16px; font-weight:800; color:var(--text-primary); margin-top:4px;" id="summaryAvgTime">0秒</div>
+        </div>
+      </div>
+      <button class="btn-primary" id="closeSummaryModal" style="width:100%; padding:12px; font-size:14px; font-weight:700;">打卡收工 🎉</button>
     </div>
   </div>
 
