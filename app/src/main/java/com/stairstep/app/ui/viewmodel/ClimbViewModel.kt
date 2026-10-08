@@ -19,6 +19,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+data class SessionSummary(
+    val laps: Int,
+    val totalFloors: Int,
+    val totalSeconds: Long,
+    val totalCalories: Double
+)
+
 class ClimbViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getInstance(application)
@@ -46,13 +53,6 @@ class ClimbViewModel(application: Application) : AndroidViewModel(application) {
     // 最新体重记录
     val latestWeightRecord: StateFlow<WeightRecord?> = weightDao.getLatestWeightFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-data class SessionSummary(
-    val laps: Int,
-    val totalFloors: Int,
-    val totalSeconds: Long,
-    val totalCalories: Double
-)
 
     // 运动会话状态
     private val _isSessionActive = MutableStateFlow(false)
