@@ -23,7 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FitnessCenter
-import androidx.compose.material.icons.rounded.Landscape
+import androidx.compose.material.icons.rounded.Terrain
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material3.Button
@@ -154,7 +154,7 @@ fun StatsScreen(
                     value = String.format(Locale.US, "%.0f", totalMeters),
                     unit = "米",
                     subtext = "相当于 $totalFloors 层楼",
-                    icon = Icons.Rounded.Landscape,
+                    icon = Icons.Rounded.Terrain,
                     iconTint = MintEmerald,
                     modifier = Modifier.weight(1f)
                 )
@@ -259,7 +259,7 @@ fun StatsScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = if (milestone.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.Landscape,
+                                imageVector = if (milestone.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.Terrain,
                                 contentDescription = null,
                                 tint = if (milestone.isCompleted) MintEmerald else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                                 modifier = Modifier.size(20.dp)
@@ -282,7 +282,7 @@ fun StatsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     LinearProgressIndicator(
-                        progress = { milestone.progressPercent },
+                        progress = milestone.progressPercent,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(6.dp)

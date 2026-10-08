@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -46,12 +45,13 @@ import com.stairstep.app.ui.viewmodel.StatsViewModel
 
 class MainActivity : ComponentActivity() {
 
-    private val climbViewModel: ClimbViewModel by viewModels()
-    private val statsViewModel: StatsViewModel by viewModels()
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val climbViewModel = androidx.lifecycle.ViewModelProvider(this)[ClimbViewModel::class.java]
+        val statsViewModel = androidx.lifecycle.ViewModelProvider(this)[StatsViewModel::class.java]
+
         setContent {
             StairStepTheme {
                 MainAppContainer(

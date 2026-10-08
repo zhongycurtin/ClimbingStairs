@@ -21,7 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.EditCalendar
+import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.Height
 import androidx.compose.material.icons.rounded.LocalFireDepartment
@@ -138,7 +138,7 @@ fun HomeScreen(
                             .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), CircleShape)
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.EditCalendar,
+                            imageVector = Icons.Rounded.DateRange,
                             contentDescription = "漏记补录",
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             modifier = Modifier.size(20.dp)
